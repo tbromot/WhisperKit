@@ -70,6 +70,10 @@ public protocol AudioProcessing {
 
     /// Resume recording audio from the specified input device, appending to continuous `audioArray` after pause
     func resumeRecordingLive(inputDeviceID: DeviceID?, callback: (([Float]) -> Void)?) throws
+    
+    /// We have a new buffer, process and store it.
+    /// NOTE: Assumes audio is 16khz mono
+    func processBuffer(_ buffer: [Float])
 }
 
 /// Overrideable default methods for AudioProcessing
