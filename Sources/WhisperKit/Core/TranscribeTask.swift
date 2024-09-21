@@ -32,11 +32,13 @@ final class TranscribeTask {
         self.textDecoder = textDecoder
         self.tokenizer = tokenizer
     }
-
+    
     func run(
         audioArray: [Float],
         decodeOptions: DecodingOptions? = nil,
-        callback: TranscriptionCallback = nil
+        callback: TranscriptionCallback = nil,
+        intermediateTranscriptionCallback:IntermediateTranscriptionCallback = nil,
+        earlyStopCallback: EarlyStopCallback = nil
     ) async throws -> TranscriptionResult {
         let interval = Logging.beginSignpost("TranscribeAudio", signposter: Logging.TranscribeTask.signposter)
         defer { Logging.endSignpost("TranscribeAudio", interval: interval, signposter: Logging.TranscribeTask.signposter) }
@@ -99,7 +101,7 @@ final class TranscribeTask {
         progress.totalUnitCount = Int64(totalSeekDuration)
 
         let startDecodeLoopTime = CFAbsoluteTimeGetCurrent()
-        for (seekClipStart, seekClipEnd) in seekClips {
+        seeksClipsFor: for (seekClipStart, seekClipEnd) in seekClips {
             // Loop through the current clip until we reach the end
             // Typically this will be the full audio file, unless seek points are explicitly provided
             var seek: Int = seekClipStart
@@ -229,7 +231,7 @@ final class TranscribeTask {
                         Logging.debug(line)
                     }
                 }
-
+                
                 // add them to the `allSegments` list
                 allSegments.append(contentsOf: currentSegments)
                 let allCurrentTokens = currentSegments.flatMap { $0.tokens }
@@ -247,6 +249,16 @@ final class TranscribeTask {
                 // Update the progress
                 let clipProgress = min(seek, seekClipEnd) - seekClipStart
                 progress.completedUnitCount = previousSeekProgress + Int64(clipProgress)
+                
+                if let intermediateTranscriptionCallback {
+                    let result = IntermediateTranscriptionResult(segments:currentSegments)
+                    intermediateTranscriptionCallback(result)
+                }
+                if let earlyStopCallback {
+                    if (earlyStopCallback()) {
+                        break seeksClipsFor
+                    }
+                }
             }
         }
 

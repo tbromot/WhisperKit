@@ -709,7 +709,9 @@ open class WhisperKit {
     public func transcribe(
         audioArray: [Float],
         decodeOptions: DecodingOptions? = nil,
-        callback: TranscriptionCallback = nil
+        callback: TranscriptionCallback = nil,
+        intermediateTranscriptionCallback:IntermediateTranscriptionCallback = nil,
+        earlyStopCallback: EarlyStopCallback = nil
     ) async throws -> [TranscriptionResult] {
         var transcribeResults = [TranscriptionResult]()
 
@@ -749,7 +751,9 @@ open class WhisperKit {
                 transcribeResults = try await runTranscribeTask(
                     audioArray: audioArray,
                     decodeOptions: decodeOptions,
-                    callback: callback
+                    callback: callback,
+                    intermediateTranscriptionCallback: intermediateTranscriptionCallback,
+                    earlyStopCallback: earlyStopCallback
                 )
         }
 
@@ -770,7 +774,9 @@ open class WhisperKit {
     private func runTranscribeTask(
         audioArray: [Float],
         decodeOptions: DecodingOptions? = nil,
-        callback: TranscriptionCallback = nil
+        callback: TranscriptionCallback = nil,
+        intermediateTranscriptionCallback:IntermediateTranscriptionCallback = nil,
+        earlyStopCallback: EarlyStopCallback = nil
     ) async throws -> [TranscriptionResult] {
         if modelState != .loaded {
             try await loadModels()
@@ -801,7 +807,9 @@ open class WhisperKit {
             let transcribeTaskResult = try await transcribeTask.run(
                 audioArray: audioArray,
                 decodeOptions: decodeOptions,
-                callback: callback
+                callback: callback,
+                intermediateTranscriptionCallback: intermediateTranscriptionCallback,
+                earlyStopCallback: earlyStopCallback
             )
 
             if let decodeOptions, decodeOptions.verbose {

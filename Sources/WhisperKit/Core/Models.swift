@@ -1464,3 +1464,14 @@ public enum Constants {
 
     public static let defaultAudioReadFrameSize: AVAudioFrameCount = 1_323_000 // 30s of audio at commonly found 44.1khz sample rate
 }
+
+public class IntermediateTranscriptionResult {
+    public let segments: [TranscriptionSegment]
+    
+    public init(segments: [TranscriptionSegment]) {
+        self.segments = segments
+    }
+}
+
+public typealias IntermediateTranscriptionCallback = ((IntermediateTranscriptionResult) -> Void)?
+public typealias EarlyStopCallback = (() -> Bool)?
