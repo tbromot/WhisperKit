@@ -513,6 +513,7 @@ public struct TranscriptionResult: Codable {
     public var language: String
     public var timings: TranscriptionTimings
     public var seekTime: Float?
+    public var hasBeenEarlyStopped: Bool = false
 
     public func logSegments() {
         for (i, segment) in segments.enumerated() {

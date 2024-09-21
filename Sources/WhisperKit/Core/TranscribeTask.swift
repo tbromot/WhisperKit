@@ -50,6 +50,8 @@ final class TranscribeTask {
         options.verbose = Logging.shared.logLevel != .none
 
         var detectedLanguage: String?
+        
+        var hasBeenEarlyStopped: Bool = false
 
         let contentFrames = audioArray.count
         timings.inputAudioSeconds = Double(contentFrames) / Double(WhisperKit.sampleRate) - Double(decodeOptions?.clipTimestamps.first ?? 0)
@@ -256,6 +258,7 @@ final class TranscribeTask {
                 }
                 if let earlyStopCallback {
                     if (earlyStopCallback()) {
+                        hasBeenEarlyStopped = true
                         break seeksClipsFor
                     }
                 }
@@ -375,7 +378,8 @@ final class TranscribeTask {
             text: transcription,
             segments: allSegments,
             language: detectedLanguage ?? Constants.defaultLanguageCode,
-            timings: timings
+            timings: timings,
+            hasBeenEarlyStopped:hasBeenEarlyStopped
         )
     }
 }

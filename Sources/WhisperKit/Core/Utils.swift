@@ -603,6 +603,8 @@ public func mergeTranscriptionResults(_ results: [TranscriptionResult?], confirm
     } else {
         mergedText = results.map { $0?.text ?? "" }.joined(separator: " ")
     }
+    
+    var hasBeenEarlyStopped = false
 
     // Merge segments
     let validResults = results.compactMap { $0 }
@@ -620,6 +622,10 @@ public func mergeTranscriptionResults(_ results: [TranscriptionResult?], confirm
             previousSeek += Float(result.timings.inputAudioSeconds)
         } else {
             previousSeek = seekTime + Float(result.timings.inputAudioSeconds)
+        }
+        
+        if result.hasBeenEarlyStopped {
+            hasBeenEarlyStopped = true
         }
     }
 
@@ -676,7 +682,8 @@ public func mergeTranscriptionResults(_ results: [TranscriptionResult?], confirm
         text: mergedText,
         segments: mergedSegments,
         language: language,
-        timings: mergedTimings
+        timings: mergedTimings,
+        hasBeenEarlyStopped: hasBeenEarlyStopped
     )
 }
 
