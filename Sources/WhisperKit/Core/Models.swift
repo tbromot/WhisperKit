@@ -609,6 +609,21 @@ public struct TranscriptionSegment: Hashable, Codable {
     public var compressionRatio: Float = 1.0
     public var noSpeechProb: Float = 0.0
     public var words: [WordTiming]? = nil
+    
+    public init(id: Int, seek: Int, start: Float, end: Float, text: String, tokens: [Int], tokenLogProbs: [[Int : Float]], temperature: Float, avgLogprob: Float, compressionRatio: Float, noSpeechProb: Float, words: [WordTiming]? = nil) {
+        self.id = id
+        self.seek = seek
+        self.start = start
+        self.end = end
+        self.text = text
+        self.tokens = tokens
+        self.tokenLogProbs = tokenLogProbs
+        self.temperature = temperature
+        self.avgLogprob = avgLogprob
+        self.compressionRatio = compressionRatio
+        self.noSpeechProb = noSpeechProb
+        self.words = words
+    }
 }
 
 public struct WordTiming: Hashable, Codable {
