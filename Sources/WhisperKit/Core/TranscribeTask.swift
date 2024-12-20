@@ -15,6 +15,8 @@ final class TranscribeTask {
     private let textDecoder: any TextDecoding
     private let tokenizer: any WhisperTokenizer
 
+    public var segmentDiscoveryCallback: SegmentDiscoveryCallback?
+
     init(
         currentTimings: TranscriptionTimings,
         progress: Progress?,
@@ -32,13 +34,11 @@ final class TranscribeTask {
         self.textDecoder = textDecoder
         self.tokenizer = tokenizer
     }
-    
+
     func run(
         audioArray: [Float],
         decodeOptions: DecodingOptions? = nil,
-        callback: TranscriptionCallback = nil,
-        intermediateTranscriptionCallback:IntermediateTranscriptionCallback = nil,
-        earlyStopCallback: EarlyStopCallback = nil
+        callback: TranscriptionCallback = nil
     ) async throws -> TranscriptionResult {
         let interval = Logging.beginSignpost("TranscribeAudio", signposter: Logging.TranscribeTask.signposter)
         defer { Logging.endSignpost("TranscribeAudio", interval: interval, signposter: Logging.TranscribeTask.signposter) }
@@ -50,8 +50,6 @@ final class TranscribeTask {
         options.verbose = Logging.shared.logLevel != .none
 
         var detectedLanguage: String?
-        
-        var hasBeenEarlyStopped: Bool = false
 
         let contentFrames = audioArray.count
         timings.inputAudioSeconds = Double(contentFrames) / Double(WhisperKit.sampleRate) - Double(decodeOptions?.clipTimestamps.first ?? 0)
@@ -103,7 +101,7 @@ final class TranscribeTask {
         progress.totalUnitCount = Int64(totalSeekDuration)
 
         let startDecodeLoopTime = CFAbsoluteTimeGetCurrent()
-        seeksClipsFor: for (seekClipStart, seekClipEnd) in seekClips {
+        for (seekClipStart, seekClipEnd) in seekClips {
             // Loop through the current clip until we reach the end
             // Typically this will be the full audio file, unless seek points are explicitly provided
             var seek: Int = seekClipStart
@@ -111,17 +109,18 @@ final class TranscribeTask {
             let previousSeekProgress = progress.completedUnitCount
 
             let windowPadding = 16000 // prevent hallucinations at the end of the clip by stopping up to 1.0s early
+            let windowSamples = featureExtractor.windowSamples ?? Constants.defaultWindowSamples
             while seek < seekClipEnd - windowPadding {
                 // calculate new encoder segment features
                 let timeOffset = Float(seek) / Float(WhisperKit.sampleRate)
-                let segmentSize = min(WhisperKit.windowSamples, contentFrames - seek, seekClipEnd - seek)
+                let segmentSize = min(windowSamples, contentFrames - seek, seekClipEnd - seek)
                 let timeOffsetEnd = Float(seek + segmentSize) / Float(WhisperKit.sampleRate)
                 Logging.debug("Decoding Seek: \(seek) (\(formatTimestamp(timeOffset))s)")
                 Logging.debug("Decoding Window Size: \(segmentSize) (\(formatTimestamp(timeOffsetEnd - timeOffset))s)")
 
                 let audioProcessingStart = Date()
                 let clipAudioSamples = Array(audioArray[seek..<(seek + segmentSize)])
-                guard let audioSamples = AudioProcessor.padOrTrimAudio(fromArray: clipAudioSamples, startAt: 0, toLength: WhisperKit.windowSamples) else {
+                guard let audioSamples = AudioProcessor.padOrTrimAudio(fromArray: clipAudioSamples, startAt: 0, toLength: windowSamples) else {
                     throw WhisperError.transcriptionFailed("Audio samples are nil")
                 }
                 let processTime = Date().timeIntervalSince(audioProcessingStart)
@@ -233,7 +232,9 @@ final class TranscribeTask {
                         Logging.debug(line)
                     }
                 }
-                
+
+                segmentDiscoveryCallback?(currentSegments)
+
                 // add them to the `allSegments` list
                 allSegments.append(contentsOf: currentSegments)
                 let allCurrentTokens = currentSegments.flatMap { $0.tokens }
@@ -251,17 +252,6 @@ final class TranscribeTask {
                 // Update the progress
                 let clipProgress = min(seek, seekClipEnd) - seekClipStart
                 progress.completedUnitCount = previousSeekProgress + Int64(clipProgress)
-                
-                if let intermediateTranscriptionCallback {
-                    let result = IntermediateTranscriptionResult(segments:currentSegments)
-                    intermediateTranscriptionCallback(result)
-                }
-                if let earlyStopCallback {
-                    if (earlyStopCallback()) {
-                        hasBeenEarlyStopped = true
-                        break seeksClipsFor
-                    }
-                }
             }
         }
 
@@ -271,7 +261,7 @@ final class TranscribeTask {
         // MARK: - Decode with Fallback Logic
 
         func decodeWithFallback(
-            encoderSegment encoderOutput: MLMultiArray,
+            encoderSegment encoderOutput: any AudioEncoderOutputType,
             decodingOptions options: DecodingOptions,
             callback: TranscriptionCallback = nil
         ) async throws -> DecodingResult {
@@ -378,8 +368,7 @@ final class TranscribeTask {
             text: transcription,
             segments: allSegments,
             language: detectedLanguage ?? Constants.defaultLanguageCode,
-            timings: timings,
-            hasBeenEarlyStopped:hasBeenEarlyStopped
+            timings: timings
         )
     }
 }
